@@ -1,0 +1,52 @@
+# NOTICE
+
+deepseek-v4.1-flash-ascend910B4 —— consumer-tail prefill truncation and scheduling fixes
+for DeepSeek-V4.1-Flash W4A8 on Ascend 910B4.
+
+Copyright 2026 <YOUR NAME / ORG>
+
+This product is a **derived work**. It is built on top of, and redistributes
+portions of, the following Apache-2.0 licensed project, and it includes
+modifications to files originating from it (Apache License 2.0, Section 4(b)):
+
+1. **deepseek-v4.1-flash-ascend910B** — the deployment package this project is
+   based on, by chiro2001 <chiro2001@163.com>
+   https://github.com/chiro2001/deepseek-v4.1-flash-ascend910B
+   Licensed under the Apache License, Version 2.0.
+   Files derived and modified:
+     - scripts/serve_a2.sh   (added: worker/env forwarding, patch mounts,
+                              container --init, long-prefill threshold)
+     - scripts/serve_v2.sh   (added: EPLB expert_map plumbing,
+                              --kv-transfer-config passthrough)
+   Files redistributed unchanged: patches/files/ 下由上游提供的补丁（本仓库未收录，
+   需要时请从上游获取）。
+
+2. **vLLM** — https://github.com/vllm-project/vllm
+   Licensed under the Apache License, Version 2.0.
+   Files derived:
+     - patches/files/scheduler.py      (from vllm/v1/core/sched/scheduler.py)
+     - patches/files/request_queue.py  (from vllm/v1/core/sched/request_queue.py)
+
+3. **vllm-ascend (V4.1 line)** — https://github.com/GDzhu01/vllm-ascend-v41-private
+   Licensed under the Apache License, Version 2.0.
+   Files derived (full-file overlays carrying this project's patches):
+     - patches/files/model_v41.py          (from vllm_ascend/models/deepseek_v41/model.py)
+     - patches/files/v41_yoco.py           (new module, imported by the above)
+     - patches/files/eplb_utils.py         (from vllm_ascend/eplb/core/eplb_utils.py)
+     - patches/files/dsa_v41_kvstore.py    (from vllm_ascend/attention/dsa_v41.py)
+
+4. **Ascend CANN / msmodelslim** — https://gitcode.com/Ascend/msmodelslim
+   Licensed under the Apache License, Version 2.0. Not redistributed here; used
+   at build/run time from the container image.
+
+## Model weights
+
+Model weights, tokenizer files and container images are **NOT distributed** with
+this repository, and remain under their own respective licenses.
+
+- Quantized checkpoint used in all measurements:
+  `chiro2001/DeepSeek-V4.1-Flash-1017-w4a8-Ascend` (ModelScope)
+  https://www.modelscope.cn/models/chiro2001/DeepSeek-V4.1-Flash-1017-w4a8-Ascend
+- Base model: DeepSeek-V4.1-Flash (DeepSeek), under the DeepSeek model license.
+
+Please review and comply with the model licenses before deployment.
