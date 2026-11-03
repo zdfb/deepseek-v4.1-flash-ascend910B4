@@ -28,7 +28,7 @@ python3 bench_equivalence.py --compare baseline yoco
 ```
 
 聚合吞吐（1K prompt / 128 输出 × 192 并发）用上游的 `tools/bench_concurrency.py`，
-见 `docs/BENCHMARKS.md`。
+见 README §1.2。
 
 ## 三个必须遵守的测量纪律
 

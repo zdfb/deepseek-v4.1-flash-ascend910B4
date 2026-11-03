@@ -17,17 +17,62 @@
 
 ## 1. 性能（8 × 910B4，真权重）
 
-完整口径见 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)。
+测试条件：TP8 / EP8、`MAX_SEQS=192`、`BAT_TOKENS=8192`、`GPU_UTIL=0.92`、
+`PREFIX=1`、`GRAPH=1`、DSpark `SP_TOKENS=5`、快速 prefill 档（`KEEP=140`）。
 
-| 维度 | 数值 |
+### 1.1 单流（并发 1，1K prompt / 128 输出）
+
+| 指标 | 数值 |
 |---|---|
-| 最大上下文 | **1,048,576 token**（模型上限，实测 973,206 通过） |
-| 单流 decode | **34.1 tok/s**（接受长度 A=2.12，每步 16.1 tok/s） |
-| 聚合 decode @192 并发 | **1,138–1,222 tok/s** |
-| 长上下文 prefill | **7,531 tok/s @252K**（上游默认 5,099，**+47%**） |
-| 973K prefill | 5,306 tok/s（TTFT 183 s） |
-| 并发容量 | 192 条短请求 / 14 条 200K / 2 条 1M（KV 池 2.94M token） |
-| prefix 复用 | 147K prompt 二次请求 TTFT **1.71 s**（冷启 18.9 s） |
+| **单流吞吐** | **34.1 tok/s** |
+| 每步耗时 | 62 ms（16.1 tok/s/step） |
+| 投机接受长度 A | 2.12（上限 6） |
+| TTFT | 0.41 s |
+
+### 1.2 并发下的单流平均吞吐与聚合吞吐
+
+| 并发 | 单流平均 tok/s | 聚合 tok/s | TTFT |
+|---:|---:|---:|---:|
+| 1 | **34.1** | 43.5 | 0.41 s |
+| 32 | 28.8 | 621.9 | 1.14 s |
+| 64 | 20.3 | 882.3 | 1.86 s |
+| 96 | 15.8 | 972.9 | 2.55 s |
+| 128 | 12.5 | 1,043.8 | 3.22 s |
+| **192** | **9.2** | **1,148.8** | 4.60 s |
+
+192 是上限：`cudagraph_capture_sizes` 最大 1152 = 192 ×(1 + 5 个 draft token)，
+再往上需要重建全部 ACL 图，实测反而更差。
+
+### 1.3 长上下文
+
+| 项目 | 数值 |
+|---|---|
+| **最大上下文** | **1,048,576 token**（模型 `max_position_embeddings`，输入+输出共用） |
+| 实测通过 | 973,206 token |
+| 超限行为 | 400 + `maximum context length is 1048576 tokens` |
+| 252K prompt prefill | 33.7 s → **7,531 tok/s**（上游默认 5,099，**+47%**） |
+| 365K prompt prefill | 50.9 s → 7,180 tok/s |
+| 973K prompt prefill | 183.4 s → 5,306 tok/s |
+
+### 1.4 容量
+
+KV 池 **2,941,744 token（13.6 GiB）**，权重占 512 GiB HBM 的约 96%：
+
+| 场景 | 单条 KV | 可同时 |
+|---|---:|---:|
+| 1M 上下文 | ~7.0 GiB | 2 |
+| 200K | ~1.0 GiB | 14 |
+| 32K | ~0.16 GiB | 90 |
+| 1K | ~5 MB | 192（受 `MAX_SEQS` 限制） |
+
+prefix cache 命中时二次请求：147K prompt 从 18.9 s 降到 **1.71 s**。
+
+### 1.5 测量口径（两组数字不要混着比）
+
+- **绝对 tok/s 不能跨 run 比**：语料随机导致接受长度 A 在 2.1–2.6 波动，
+  同一配置可差 13%。跨配置比较请用 `聚合 ÷ A`（本机所有配置都落在 438–468）。
+- **长上下文测量必须加唯一 nonce**：否则第二次命中 prefix cache（6.9 s → 0.64 s）。
+- 复现脚本见 [`benchmarks/`](benchmarks/)。
 
 ## 2. 我们加了什么
 
@@ -68,7 +113,6 @@ deepseek-v4.1-flash-ascend910B4/
 ├── CHANGELOG.md
 ├── docs/
 │   ├── ARCHITECTURE.md     为什么这样改能快（含 KEEP 的正确推导）
-│   ├── BENCHMARKS.md       全部实测数据 + 测量方法（含 A 归一化陷阱）
 │   ├── DEPLOY.md           镜像、启动、验证、调模式
 │   ├── PACKAGING.md        从原镜像打包成新镜像（照搬上游做法 + commit 路径的坑）
 │   ├── TROUBLESHOOTING.md  13 个真实踩坑记录
@@ -82,12 +126,12 @@ deepseek-v4.1-flash-ascend910B4/
 └── deploy/                 Dockerfile + docker run
 ```
 
-## 5. 已排除的方向（都有实测，别再踩）
+## 5. 不要再去调的旋钮
 
-`BAT_TOKENS` 调大会吃掉 KV 并 OOM；`MAX_SEQS>192` 需要重建全部图且实测更差；
-`SP_TOKENS` 被 build 硬限制为 ≥5；KV 量化（fp8/int8）在本 build 上静默回退 bf16；
-prefill MC2 反而慢 20%；关闭 engram 只快 5%；EPLB 冗余专家超出算子索引边界。
-详见 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) 第 5 节。
+这些都被验证过是死路，改之前先看 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)：
+`BAT_TOKENS` 调大会吃掉 KV 并 OOM；`MAX_SEQS>192` 要重建全部图且更慢；
+`SP_TOKENS` 被 build 硬限制为 ≥5；KV 量化（fp8/int8）在本 build 静默回退 bf16；
+prefill MC2 反而慢 20%；EPLB 冗余专家超出算子索引边界 384。
 
 ## 6. 引用
 

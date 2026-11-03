@@ -63,7 +63,7 @@ Ascend 后端只认 `"protocol": "ascend"`。
 跨 run 比较必须让被测档位不是首档。
 
 **B. 绝对吞吐不可跨 run 比。** 语料随机导致接受长度 A 在 2.1–2.6 波动，
-必须用 `聚合 ÷ A` 归一（详见 `docs/BENCHMARKS.md`）。
+必须用 `聚合 ÷ A` 归一（见 README §1.5）。
 
 **C. prefix cache 会污染长上下文测量。** 重复 prompt 第二次走缓存（6.9 s → 0.64 s），
 测真实 prefill 要给每个请求加唯一 nonce。
