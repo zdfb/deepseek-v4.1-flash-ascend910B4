@@ -1,7 +1,7 @@
 # DeepSeek-V4.1-Flash 910B4 Turbo
 
 在 **8 × Ascend 910B4（64 GiB/卡）** 上把 DeepSeek-V4.1-Flash **W4A8** 推理做到
-**1M 上下文 + 192 并发 + 长 prefill 提速 47%**，并给出可复现的测量口径。
+**1M 上下文 + 192 并发 + 长 prefill 提速 40%**，并给出可复现的测量口径。
 
 本项目是 [`chiro2001/deepseek-v4.1-flash-ascend910B`](https://github.com/chiro2001/deepseek-v4.1-flash-ascend910B)
 的下游分支，只做**增量优化**，不重新造轮子。请先读 [`ACKNOWLEDGMENTS.md`](ACKNOWLEDGMENTS.md)。
@@ -13,7 +13,7 @@
 > 这个模型 40 层里只有 **4 层产长上下文 KV**，第 21 层之后全是「消费者层」——
 > 它们只写自己的 128-token 滑窗、长 KV 全读源层。
 > 所以 **prefill 时尾部 19 层只需要算每个请求末尾的一小段 token**。
-> 我们把这件事实做成了可用的补丁：长 prefill **从 5,099 提升到 7,531 tok/s**。
+> 我们把这件事实做成了可用的补丁：长 prefill **从 5,099 提升到 7,162 tok/s**。
 
 ## 1. 性能（8 × 910B4，真权重）
 
@@ -24,39 +24,45 @@
 
 | 指标 | 数值 |
 |---|---|
-| **单流吞吐** | **34.1 tok/s** |
-| 每步耗时 | 62 ms（16.1 tok/s/step） |
-| 投机接受长度 A | 2.12（上限 6） |
-| TTFT | 0.41 s |
+| **单流吞吐** | **38.6 tok/s** |
+| 每步耗时 | 67 ms（15.0 tok/s/step） |
+| 投机接受长度 A | 2.57（上限 6） |
+| TTFT | 0.42 s |
 
 ### 1.2 并发下的单流平均吞吐与聚合吞吐
 
-| 并发 | 单流平均 tok/s | 聚合 tok/s | TTFT |
-|---:|---:|---:|---:|
-| 1 | **34.1** | 43.5 | 0.41 s |
-| 32 | 28.8 | 621.9 | 1.14 s |
-| 64 | 20.3 | 882.3 | 1.86 s |
-| 96 | 15.8 | 972.9 | 2.55 s |
-| 128 | 12.5 | 1,043.8 | 3.22 s |
-| **192** | **9.2** | **1,148.8** | 4.60 s |
+每档 192 条请求（并发 1 用 16 条），请求带唯一 nonce 避免 prefix cache 命中。
+
+| 并发 | 单流平均 tok/s | 聚合 tok/s | A | TTFT |
+|---:|---:|---:|---:|---:|
+| 1 | **38.6** | 39.5 | 2.57 | 0.42 s |
+| 32 | 28.7 | 540.8 | 2.27 | 1.23 s |
+| 64 | 17.8 | 723.5 | 2.27 | 2.33 s |
+| 96 | 13.6 | 851.4 | 2.28 | 2.68 s |
+| 128 | 12.8 | 850.9 | 2.26 | 2.87 s |
+| **192** | **8.0** | **1,008.4** | 2.31 | 5.05 s |
 
 192 是上限：`cudagraph_capture_sizes` 最大 1152 = 192 ×(1 + 5 个 draft token)，
 再往上需要重建全部 ACL 图，实测反而更差。
+
+吞吐 ≈ 15 tok/s/step × A：A 每 +0.1 约 +4%，所以跨 run 比较请用 `聚合 ÷ A`（本机各配置都落在 240–390）。
 
 ### 1.3 长上下文
 
 | 项目 | 数值 |
 |---|---|
 | **最大上下文** | **1,048,576 token**（模型 `max_position_embeddings`，输入+输出共用） |
-| 实测通过 | 973,206 token |
+| 实测通过 | 965,209 token |
 | 超限行为 | 400 + `maximum context length is 1048576 tokens` |
-| 252K prompt prefill | 33.7 s → **7,531 tok/s**（上游默认 5,099，**+47%**） |
-| 365K prompt prefill | 50.9 s → 7,180 tok/s |
-| 973K prompt prefill | 183.4 s → 5,306 tok/s |
+| 240K prompt prefill | 33.6 s → **7,162 tok/s** |
+| 965K prompt prefill | 186.5 s → 5,175 tok/s |
+
+对照：同机不截断（`V41_YOCO_KEEP=0`）时 252K prompt 为 5,099 tok/s，
+开启消费者层截断后 **+40%**（不同次运行，见 §1.5 口径说明）。
 
 ### 1.4 容量
 
-KV 池 **2,941,744 token（13.6 GiB）**，权重占 512 GiB HBM 的约 96%：
+KV 池 **2,941,853 token（13.6 GiB）**，权重占 512 GiB HBM 的约 96%：
 
 | 场景 | 单条 KV | 可同时 |
 |---|---:|---:|
@@ -78,7 +84,7 @@ prefix cache 命中时二次请求：147K prompt 从 18.9 s 降到 **1.71 s**。
 
 | 补丁 | 作用 | 收益 |
 |---|---|---|
-| [`patches/files/model_v41.py`](patches/files/model_v41.py) + [`v41_yoco.py`](patches/files/v41_yoco.py) | 消费者层 prefill 截断（YOCO） | 长 prefill **+47%** |
+| [`patches/files/model_v41.py`](patches/files/model_v41.py) + [`v41_yoco.py`](patches/files/v41_yoco.py) | 消费者层 prefill 截断（YOCO） | 长 prefill **+40%** |
 | [`patches/files/request_queue.py`](patches/files/request_queue.py) | 按上下文长度分档的调度队列 | 混长负载短请求 p50 **206 s → 69 s** |
 | [`patches/files/scheduler.py`](patches/files/scheduler.py) | 长 prefill 并发上限 | 同上（需配合关闭 admission gate） |
 | [`patches/files/eplb_utils.py`](patches/files/eplb_utils.py) | EPLB 加载器兼容 DSpark drafter | 修通 `expert_map` 的构造期崩溃 |

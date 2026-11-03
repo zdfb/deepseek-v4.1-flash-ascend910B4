@@ -81,7 +81,7 @@ ENV V41_YOCO_KEEP=140 \
 WORKDIR /workspace
 
 LABEL org.opencontainers.image.title="deepseek-v4.1-flash-ascend910B4" \
-      org.opencontainers.image.description="DeepSeek-V4.1-Flash W4A8 on 8x Ascend 910B4: consumer-tail prefill truncation (+47% long-context prefill)" \
+      org.opencontainers.image.description="DeepSeek-V4.1-Flash W4A8 on 8x Ascend 910B4: consumer-tail prefill truncation (+40% long-context prefill)" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.base.name="${BASE_IMAGE}"
 

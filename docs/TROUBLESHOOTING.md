@@ -54,7 +54,13 @@ DSpark drafter 有 128 专家，而 `expert_file_to_tensor` 对 MTP 层复用 la
 **12. `NotImplementedError: MooncakeBackend does not support protocol 'tcp'.`**
 Ascend 后端只认 `"protocol": "ascend"`。
 
-**13. `ValueError: Sparse KV offload don't support compress now.`**
+**13. 压测中 kill 掉客户端后，引擎对后续请求**全部挂起**（单请求也超时）**
+现象：`docker logs` 里不再出现 `Running: N reqs`，NPU 占用显示空闲，
+但新请求一律超时；`docker restart` 也恢复不了，必须 `docker rm -f` 重建容器。
+原因：大并发批次里客户端断连后请求没被正确清理，调度器卡住。
+规避：压测脚本要能优雅收尾；出现该现象直接重建容器。
+
+**14. `ValueError: Sparse KV offload don't support compress now.`**
 内置的 `sparse_kv_offload_config` 明确拒绝带 `compress_ratios` 的模型——正是本模型。
 
 ## 测量陷阱（不算报错，但会让结论错）

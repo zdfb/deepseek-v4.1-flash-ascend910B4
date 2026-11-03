@@ -8,7 +8,7 @@ prefill 截断与调度修复，全部在 8×910B4 上实测。
 ### Added
 
 - **消费者层 prefill 截断（YOCO）**：`patches/files/model_v41.py` + `v41_yoco.py`。
-  - 长上下文 prefill：**5,099 → 7,531 tok/s（+47%）** @252K
+  - 长上下文 prefill：**5,099 → 7,162 tok/s（+40%）** @240K
   - `KEEP` 按 `window × (消费者层数 + 1)` 推导（2,560），提供 140 的快速近似档
   - `V41_YOCO_MIN_CHUNK=4096` 门槛，短 prompt 零损失
   - 并发安全：裁剪后元数据改为每次新分配（修掉 `NPUGraph 507899` 崩溃）
