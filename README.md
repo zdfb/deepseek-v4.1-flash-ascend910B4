@@ -48,7 +48,7 @@
 #    权重：https://www.modelscope.cn/models/chiro2001/DeepSeek-V4.1-Flash-1017-w4a8-Ascend
 
 # 2) 构建镜像（把补丁烘进正式路径）
-docker build -t deepseek-v4.1-flash-ascend910B4:910b4 deploy/
+docker build -t deepseek-v4.1-flash-ascend910B4:910b4 .
 
 # 3) 起服（业务挂载只有模型，必须可写）
 bash deploy/docker-run.sh

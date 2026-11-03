@@ -17,7 +17,7 @@
 docker build -t deepseek-v4.1-flash-ascend910B4:910b4 .
 ```
 
-`Dockerfile` 做的事：
+根目录 `Dockerfile` 做的事：
 
 1. `FROM` 上游镜像（可用 `--build-arg BASE_IMAGE=...` 覆盖）；
 2. 把 `patches/files/` 下的补丁 COPY 到**正式导入路径**（不是靠挂载）：
