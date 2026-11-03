@@ -66,5 +66,5 @@ sparse_kv_offload  : 12 处（内置 KV 卸载，但拒绝 compress_ratios 模�
 
 上游 `EXPECTED_PERF.md` 的主表是 **A3（8×910C、16 device）**：
 128K 单流 30.23 ms/step、A=2.748、90.13 tok/s（峰值 110.5）。
-本仓库所有数字是 **A2（8×910B4、8 device）**：单流 34.1 tok/s（16.1 tok/s/step，A=2.12）。
+本仓库所有数字是 **A2（8×910B4、8 device）**：单流 38.6 tok/s（15.0 tok/s/step，A=2.57）。
 硬件不同，只能做「同机同配置 A/B」，不能跨平台比绝对值。

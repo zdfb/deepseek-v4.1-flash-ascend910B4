@@ -87,9 +87,9 @@ python3 benchmarks/check_long_ctx.py --chars 390000     # 期望 TTFT ≈ 33 s /
 
 | 模式 | 设置 | 长 prefill | 等价性 |
 |---|---|---|---|
-| **默认（快速）** | 镜像已烘入 `KEEP=140 APPROX=1` | 7,531 tok/s | 长 prompt 近似 |
-| 精确截断 | `-e V41_YOCO_KEEP=2560 -e V41_YOCO_APPROX=0` | 4,958 tok/s | 理论等价 |
-| 完全关闭 | `-e V41_YOCO_KEEP=0` | 5,099 tok/s | 完全等价 |
+| **默认（快速）** | 镜像已烘入 `KEEP=140 APPROX=1` | 7,162 tok/s | 长 prompt 近似 |
+| 精确截断 | `-e V41_YOCO_KEEP=2560 -e V41_YOCO_APPROX=0` | ~4,950 tok/s | 理论等价 |
+| 完全关闭 | `-e V41_YOCO_KEEP=0` | ~5,100 tok/s | 完全等价 |
 
 分档调度（混长负载）：
 
