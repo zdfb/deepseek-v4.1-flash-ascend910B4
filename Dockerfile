@@ -1,28 +1,79 @@
 # syntax=docker/dockerfile:1
 #
-# deepseek-v4.1-flash-ascend910B4
+# deepseek-v4.1-flash-ascend910B4 —— 从上游镜像烘焙本项目补丁
 #
-# 在上游部署镜像之上，把本项目的 7 个补丁烘到正式导入路径，并把验证过的
-# vLLM 命令行固定成 CMD（原生 vLLM 镜像风格：运行时只需挂载模型）。
+# 用法（一般由 scripts/build_image.sh 调用，不手写）：
+#   docker build \
+#     --build-arg BASE_IMAGE=<上游镜像> \
+#     -t deepseek-v4.1-flash-ascend910B4:910b4 .
 #
-#   docker build -t deepseek-v4.1-flash-ascend910B4:910b4 .
-#   docker build --build-arg BASE_IMAGE=<你的上游镜像> -t ... .
+# 设计沿用上游项目的做法：
+#   1. 补丁先 COPY 到 /tmp/bake，再由 RUN 安装到目标路径（保留 <file>.orig 备份）；
+#   2. 安装路径用 ARG 参数化（不同镜像布局可能不同，不写死）；
+#   3. 构建期做 py_compile 校验，坏补丁不会产出镜像；
+#   4. 镜像不含模型权重。
 #
 ARG BASE_IMAGE=quay.nju.edu.cn/ascend/vllm-ascend:deepseek-v4.1-flash-openeuler
 FROM ${BASE_IMAGE}
-# 重新声明，供下面的 LABEL 使用（FROM 之前的 ARG 在 stage 内不可见）
-ARG BASE_IMAGE
 
-# ---- 补丁：整文件覆盖到正式导入路径 ----
-COPY patches/files/model_v41.py          /vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v41/model.py
-COPY patches/files/v41_yoco.py           /vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v41/v41_yoco.py
-COPY patches/files/device_metadata.py    /vllm-workspace/vllm-ascend/vllm_ascend/worker/device_metadata.py
-COPY patches/files/dsa_v41_kvstore.py    /vllm-workspace/vllm-ascend/vllm_ascend/attention/dsa_v41.py
-COPY patches/files/request_queue.py      /vllm-workspace/vllm/vllm/v1/core/sched/request_queue.py
-COPY patches/files/scheduler.py          /vllm-workspace/vllm/vllm/v1/core/sched/scheduler.py
-COPY patches/files/eplb_utils.py         /vllm-workspace/vllm-ascend/vllm_ascend/eplb/core/eplb_utils.py
+# FROM 之前声明的 ARG 在 FROM 之后不可见，必须重新声明。
+ARG BASE_IMAGE=quay.nju.edu.cn/ascend/vllm-ascend:deepseek-v4.1-flash-openeuler
+ARG ASCEND_PKG=/vllm-workspace/vllm-ascend/vllm_ascend
+ARG VLLM_ROOT=/vllm-workspace/vllm
 
-# ---- 默认行为：快速 prefill 档（近似）；精确档用 -e 覆盖 ----
+ENV ASCEND_PKG=${ASCEND_PKG} \
+    VLLM_ROOT=${VLLM_ROOT} \
+    BASE_IMAGE_TAG=${BASE_IMAGE}
+
+SHELL ["/bin/bash", "-lc"]
+USER root
+
+# ---------- 1) 补丁暂存 ----------
+COPY patches/files/model_v41.py        /tmp/bake/model_v41.py
+COPY patches/files/v41_yoco.py         /tmp/bake/v41_yoco.py
+COPY patches/files/device_metadata.py  /tmp/bake/device_metadata.py
+COPY patches/files/dsa_v41_kvstore.py  /tmp/bake/dsa_v41_kvstore.py
+COPY patches/files/request_queue.py    /tmp/bake/request_queue.py
+COPY patches/files/scheduler.py        /tmp/bake/scheduler.py
+COPY patches/files/eplb_utils.py       /tmp/bake/eplb_utils.py
+
+# ---------- 2) 安装到正式导入路径（前 6 个覆盖已有文件，v41_yoco.py 是新增模块）----------
+RUN set -euo pipefail; \
+    install_overlay() { \
+        src="$1"; dst="$2"; \
+        [ -f "$dst" ] || { echo "[bake][FAIL] 目标不存在，基础镜像布局变了？ $dst" >&2; exit 1; }; \
+        [ -f "$dst.orig" ] || cp -a "$dst" "$dst.orig"; \
+        install -m 0644 "$src" "$dst"; \
+        echo "[bake] overlay $(basename "$src") -> $dst"; \
+    }; \
+    install_new() { \
+        src="$1"; dst="$2"; \
+        mkdir -p "$(dirname "$dst")"; \
+        install -m 0644 "$src" "$dst"; \
+        echo "[bake] new     $(basename "$src") -> $dst"; \
+    }; \
+    install_overlay /tmp/bake/model_v41.py        "${ASCEND_PKG}/models/deepseek_v41/model.py"; \
+    install_new     /tmp/bake/v41_yoco.py         "${ASCEND_PKG}/models/deepseek_v41/v41_yoco.py"; \
+    install_overlay /tmp/bake/device_metadata.py  "${ASCEND_PKG}/worker/device_metadata.py"; \
+    install_overlay /tmp/bake/dsa_v41_kvstore.py  "${ASCEND_PKG}/attention/dsa_v41.py"; \
+    install_overlay /tmp/bake/request_queue.py    "${VLLM_ROOT}/vllm/v1/core/sched/request_queue.py"; \
+    install_overlay /tmp/bake/scheduler.py        "${VLLM_ROOT}/vllm/v1/core/sched/scheduler.py"; \
+    install_overlay /tmp/bake/eplb_utils.py       "${ASCEND_PKG}/eplb/core/eplb_utils.py"
+
+# ---------- 3) 构建期校验：坏补丁不能产出镜像 ----------
+RUN set -euo pipefail; \
+    python3 -m py_compile \
+        "${ASCEND_PKG}/models/deepseek_v41/model.py" \
+        "${ASCEND_PKG}/models/deepseek_v41/v41_yoco.py" \
+        "${ASCEND_PKG}/worker/device_metadata.py" \
+        "${ASCEND_PKG}/attention/dsa_v41.py" \
+        "${VLLM_ROOT}/vllm/v1/core/sched/request_queue.py" \
+        "${VLLM_ROOT}/vllm/v1/core/sched/scheduler.py" \
+        "${ASCEND_PKG}/eplb/core/eplb_utils.py"; \
+    echo "[bake] py_compile OK"; \
+    rm -rf /tmp/bake
+
+# ---------- 4) 默认行为：快速 prefill 档（近似）。精确档用 -e 覆盖 ----------
 ENV V41_YOCO_KEEP=140 \
     V41_YOCO_APPROX=1 \
     V41_YOCO_MIN_CHUNK=4096

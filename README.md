@@ -70,13 +70,14 @@ deepseek-v4.1-flash-ascend910B4/
 │   ├── ARCHITECTURE.md     为什么这样改能快（含 KEEP 的正确推导）
 │   ├── BENCHMARKS.md       全部实测数据 + 测量方法（含 A 归一化陷阱）
 │   ├── DEPLOY.md           镜像、启动、验证、调模式
+│   ├── PACKAGING.md        从原镜像打包成新镜像（照搬上游做法 + commit 路径的坑）
 │   ├── TROUBLESHOOTING.md  13 个真实踩坑记录
 │   ├── UPSTREAM-DIFF.md    与上游逐文件差异清单
 │   └── ROADMAP.md          host KV tier、投机接受长度等后续方向
 ├── patches/
 │   ├── README.md           每个补丁的作用、挂载点、开关
 │   └── files/              6 个补丁文件
-├── scripts/                起服脚本（上游基础上小改）+ EPLB 布局表
+├── scripts/                起服脚本（上游基础上小改）+ build_image.sh + EPLB 布局表
 ├── benchmarks/             可复现的测量脚本（长上下文/混长/复用/等价性）
 └── deploy/                 Dockerfile + docker run
 ```
