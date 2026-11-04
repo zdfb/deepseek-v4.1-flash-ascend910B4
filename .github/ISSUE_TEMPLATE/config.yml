@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 部署与踩坑文档
+    url: https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/blob/master/docs/TROUBLESHOOTING.md
+    about: 13 个真实踩坑记录，提 issue 前先看
+  - name: 路线图与死路清单
+    url: https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/blob/master/docs/ROADMAP.md
+    about: 已知方向与已验证的死路，避免重复负结果

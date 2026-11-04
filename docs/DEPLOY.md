@@ -11,6 +11,16 @@
 
 权重需**可写**挂载：engram 的 int8 表在启动时会回写索引文件。
 
+> **可复现性前置**：本项目**不从源码编译 vllm-ascend**，也不依赖任何私有仓库。
+> 复现路径只有两条都是"取现成产物"：
+> 1. **基础镜像**：`quay.nju.edu.cn/ascend/vllm-ascend:deepseek-v4.1-flash-openeuler`
+>    （可达性由镜像托管方决定；拿不到时可换你所在环境提供的等价 V4.1 镜像，
+>    再用 `--build-arg BASE_IMAGE=...` 覆盖）。
+> 2. **量化权重**：ModelScope `chiro2001/DeepSeek-V4.1-Flash-1017-w4a8-Ascend`。
+>
+> 本仓库只增量提供 `patches/` `scripts/` `benchmarks/` `docs/` 与 `Dockerfile`。
+> 权重与镜像**均不随仓库分发**，遵循各自许可证。
+
 ## 2. 构建
 
 ```bash

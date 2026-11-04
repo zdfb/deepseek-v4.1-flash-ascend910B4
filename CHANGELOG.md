@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **单流口径更新**：干净重启后单流（1K prompt / 128 输出）实测 **50.9 tok/s、TTFT 0.375 s**
+  （早前一轮为 38.6 tok/s / 0.42 s）。README §1.1/§1.2/§1.5 与 `docs/UPSTREAM-DIFF.md`
+  同步改为「38.6–50.9 区间 + 随设备状态/A 波动」，并明确记录单流数字需附带条件。
+
 ## [0.1.0] — 2026-11-03
 
 首个公开版本。基于上游 `deepseek-v4.1-flash-ascend910B` 的部署包，新增长上下文

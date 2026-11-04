@@ -36,7 +36,9 @@ Ascend 版权重开放出来。本仓库的所有数字都是在这份权重上�
 ## 3. 生态
 
 - **vLLM**（https://github.com/vllm-project/vllm）——调度器、KV 管理、投机解码框架
-- **vllm-ascend**（https://github.com/GDzhu01/vllm-ascend-v41-private）——昇腾后端
+- **vllm-ascend**（V4.1 line：https://github.com/GDzhu01/vllm-ascend-v41-private）——昇腾后端。
+  ⚠️ 该仓库目前**非公开可达**，此处仅作署名；本仓库不依赖它构建，请直接用预构建基础镜像
+  （见 [`docs/DEPLOY.md`](docs/DEPLOY.md)）。
 - **Ascend CANN / msmodelslim**——算子库与量化工具链
 - **Mooncake**——KV store / 传输引擎（本仓库的 host KV 探索基于它，见 `docs/ROADMAP.md`）
 

@@ -1,0 +1,53 @@
+name: Bug 报告 / Bug report
+description: 运行、部署或测量中遇到的问题
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！提 issue 前请先看
+        [`docs/TROUBLESHOOTING.md`](https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/blob/master/docs/TROUBLESHOOTING.md)，
+        很多坑已有记录。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 发生了什么？期望是什么？
+      placeholder: 期望 …，实际 …
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: "尽量给出从 `docker run` 到出错的最小路径"
+      placeholder: |
+        1. bash deploy/docker-run.sh
+        2. curl ...
+        3. 观察 ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: "卡型号与数量、CANN/驱动版本、镜像 tag、`npu-smi info` 摘要"
+      placeholder: |
+        - 硬件: 8 × Ascend 910B4
+        - CANN: 9.1.0 驱动: 25.5.0
+        - 镜像: deepseek-v4.1-flash-ascend910B4:910b4
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: "`docker logs` 相关片段、`curl /health` 状态"
+      render: shell
+  - type: textarea
+    id: config
+    attributes:
+      label: 关键配置
+      description: "`docker inspect <name> --format '{{.Config.Cmd}}'` 与关键环境变量"
+      render: shell

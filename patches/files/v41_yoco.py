@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright 2026 zdfb
 """YOCO-style consumer-tail prefill truncation for DeepSeek-V4.1.
 
 Every layer after the last KV source (layer 20) is a pure *consumer*: it owns

@@ -1,0 +1,37 @@
+name: 功能 / 性能建议
+description: 提出新功能、新优化方向或性能改进
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提优化建议前，请先读 [`docs/ROADMAP.md`](https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/blob/master/docs/ROADMAP.md)
+        与 [`docs/TROUBLESHOOTING.md`](https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/blob/master/docs/TROUBLESHOOTING.md)——
+        很多方向已被验证为死路，避免重复负结果。
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 动机 / 解决什么问题
+      description: 哪个场景慢？哪个指标不满意？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 方案
+      description: 你打算怎么改？涉及哪些文件 / 算子 / 配置？
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 依据
+      description: |
+        若有实测数据或上游文档支持，请贴出来。性能声称必须可复现
+        （见 CONTRIBUTING.md 第 5 节：用 聚合 ÷ A 归一化，长上下文加 nonce）。
+  - type: textarea
+    id: deadends
+    attributes:
+      label: 已排除的负结果
+      description: 说明你没有重复 ROADMAP / TROUBLESHOOTING 里已有的负结果

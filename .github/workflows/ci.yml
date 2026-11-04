@@ -1,0 +1,87 @@
+name: CI
+
+# 本项目需要昇腾 NPU 才能做真机测试，GitHub 托管 runner 没有 NPU。
+# 这里只做"不需要硬件"的静态检查：Python 语法、许可证头、敏感信息、
+# 以及文档里引用的本地路径。真机 benchmark 需在 910B 机器上手动跑。
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python 语法检查（patches + benchmarks + scripts 内嵌）
+        run: |
+          set -e
+          fail=0
+          for f in patches/files/*.py benchmarks/*.py; do
+            python -m py_compile "$f" || { echo "语法错误: $f"; fail=1; }
+          done
+          bash -n scripts/*.sh deploy/*.sh || { echo "shell 语法错误"; fail=1; }
+          exit $fail
+
+      - name: 许可证头检查（派生文件必须保留 Apache-2.0 / SPDX）
+        run: |
+          set -e
+          fail=0
+          for f in patches/files/*.py; do
+            if ! head -20 "$f" | grep -qiE "Apache License|SPDX-License-Identifier"; then
+              echo "缺少许可证头: $f"; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: 敏感信息扫描
+        run: |
+          set -e
+          # 禁止：明显口令、明文内网 IP（除 127.0.0.1/0.0.0.0）、私钥块
+          if grep -rniE "Passw0rd|-----BEGIN [A-Z ]*PRIVATE KEY-----|password\s*[:=]\s*\S+" \
+               --include="*.py" --include="*.sh" --include="*.md" --include="Dockerfile" . \
+               | grep -v "^\./\.git"; then
+            echo "发现疑似敏感信息，请移除"; exit 1
+          fi
+          echo "OK"
+
+      - name: 反向链接检查（README 引用的本地文件必须存在）
+        run: |
+          set -e
+          fail=0
+          python - <<'PY'
+          import os, re, sys
+          root = "."
+          bad = []
+          for dirpath, _, files in os.walk(root):
+              if "/.git" in dirpath:
+                  continue
+              for fn in files:
+                  if not fn.endswith(".md"):
+                      continue
+                  p = os.path.join(dirpath, fn)
+                  text = open(p, encoding="utf-8", errors="ignore").read()
+                  for m in re.finditer(r"\]\(([^)]+)\)", text):
+                      link = m.group(1)
+                      if link.startswith(("http://", "https://", "#", "mailto:")):
+                          continue
+                      target = link.split("#")[0]
+                      if not target:
+                          continue
+                      resolved = os.path.normpath(os.path.join(dirpath, target))
+                      if not os.path.exists(resolved):
+                          bad.append(f"{p}: -> {link}")
+          if bad:
+              print("以下相对链接指向不存在的文件:")
+              print("\n".join(bad))
+              sys.exit(1)
+          print("相对链接 OK")
+          PY
+          exit $fail

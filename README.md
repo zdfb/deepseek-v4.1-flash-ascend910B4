@@ -1,5 +1,11 @@
 # DeepSeek-V4.1-Flash 910B4 Turbo
 
+[![CI](https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/actions/workflows/ci.yml/badge.svg)](https://github.com/zdfb/deepseek-v4.1-flash-ascend910B4/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Hardware](https://img.shields.io/badge/hardware-8%C3%97Ascend%20910B4-orange.svg)](docs/DEPLOY.md)
+[![Context](https://img.shields.io/badge/context-1M%20tokens-green.svg)](docs/ARCHITECTURE.md)
+[![Status](https://img.shields.io/badge/status-experimental-yellow.svg)](#8-项目状态)
+
 在 **8 × Ascend 910B4（64 GiB/卡）** 上把 DeepSeek-V4.1-Flash **W4A8** 推理做到
 **1M 上下文 + 192 并发 + 长 prefill 提速 40%**，并给出可复现的测量口径。
 
@@ -24,10 +30,14 @@
 
 | 指标 | 数值 |
 |---|---|
-| **单流吞吐** | **38.6 tok/s** |
-| 每步耗时 | 67 ms（15.0 tok/s/step） |
-| 投机接受长度 A | 2.57（上限 6） |
-| TTFT | 0.42 s |
+| **单流吞吐** | **50.9 tok/s** |
+| TTFT | 0.375 s |
+| 每步耗时 | ~50 ms（依 A 波动，见下） |
+| 投机接受长度 A | 随语料在 2.2–2.6 波动 |
+
+> 该值为干净重启后、单流 1K prompt 的单次实测。单流 tok/s 强依赖投机接受长度 A 与
+> 设备状态（长跑后有热漂移/显存碎片会偏低，早前一轮为 38.6 tok/s），**跨 run 不要直接比
+> 绝对值**，见 §1.5 测量口径。
 
 ### 1.2 并发下的单流平均吞吐与聚合吞吐
 
@@ -35,17 +45,21 @@
 
 | 并发 | 单流平均 tok/s | 聚合 tok/s | A | TTFT |
 |---:|---:|---:|---:|---:|
-| 1 | **38.6** | 39.5 | 2.57 | 0.42 s |
+| 1 | **50.9** | ~52 | —¹ | 0.375 s |
 | 32 | 28.7 | 540.8 | 2.27 | 1.23 s |
 | 64 | 17.8 | 723.5 | 2.27 | 2.33 s |
 | 96 | 13.6 | 851.4 | 2.28 | 2.68 s |
 | 128 | 12.8 | 850.9 | 2.26 | 2.87 s |
 | **192** | **8.0** | **1,008.4** | 2.31 | 5.05 s |
 
+¹ 并发 1 的 50.9 tok/s 为干净重启后单次实测（A 随语料 2.2–2.6 波动，该次未单独记录）；
+其余档位为同批 192 请求、带 nonce 的整套测量。
+
 192 是上限：`cudagraph_capture_sizes` 最大 1152 = 192 ×(1 + 5 个 draft token)，
 再往上需要重建全部 ACL 图，实测反而更差。
 
-吞吐 ≈ 15 tok/s/step × A：A 每 +0.1 约 +4%，所以跨 run 比较请用 `聚合 ÷ A`（本机各配置都落在 240–390）。
+吞吐 ≈ 每步 tok/s × A：A 每 +0.1 约 +4%。步时本身也随设备状态（热漂移、显存碎片）变化，
+所以**跨 run 比较请用 `聚合 ÷ A`**，不要直接比绝对 tok/s。
 
 ### 1.3 长上下文
 
@@ -75,8 +89,10 @@ prefix cache 命中时二次请求：147K prompt 从 18.9 s 降到 **1.71 s**。
 
 ### 1.5 测量口径（两组数字不要混着比）
 
-- **绝对 tok/s 不能跨 run 比**：语料随机导致接受长度 A 在 2.1–2.6 波动，
-  同一配置可差 13%。跨配置比较请用 `聚合 ÷ A`（本机所有配置都落在 438–468）。
+- **绝对 tok/s 不能跨 run 比**：除语料随机导致接受长度 A 在 2.1–2.6 波动外，
+  设备状态（热漂移、长跑后的显存碎片）也会让步时变化——同一配置单流实测从
+  38.6 到 50.9 tok/s 都出现过。跨配置比较请用 `聚合 ÷ A`。
+- **记录单流数字时请附带条件**（prompt 长度、是否干净重启、A），否则不可复现。
 - **长上下文测量必须加唯一 nonce**：否则第二次命中 prefix cache（6.9 s → 0.64 s）。
 - 复现脚本见 [`benchmarks/`](benchmarks/)。
 
@@ -117,6 +133,10 @@ deepseek-v4.1-flash-ascend910B4/
 ├── NOTICE                  完整版权与依赖声明
 ├── ACKNOWLEDGMENTS.md      致谢：上游项目、开源权重、生态
 ├── CHANGELOG.md
+├── CONTRIBUTING.md         贡献指南（含"实测依据"硬要求）
+├── CODE_OF_CONDUCT.md      行为准则
+├── SECURITY.md             安全策略（含 --privileged 部署注意）
+├── .github/                Issue / PR 模板 + 无硬件 CI
 ├── docs/
 │   ├── ARCHITECTURE.md     为什么这样改能快（含 KEEP 的正确推导）
 │   ├── DEPLOY.md           镜像、启动、验证、调模式
@@ -154,3 +174,24 @@ prefill MC2 反而慢 20%；EPLB 冗余专家超出算子索引边界 384。
 ## 7. 许可证
 
 Apache-2.0，与上游一致。模型权重与容器镜像不在本仓库分发，遵循各自许可证。
+
+## 8. 项目状态
+
+- **阶段**：实验性部署优化包（experimental），按"现状"提供，不承诺生产 SLA。
+- **验证范围**：全部性能数字在 **单机 8 × Ascend 910B4**、CANN 9.1.0 上实测；
+  未在其他昇腾型号（910B 其它 die、910C、Atlas 系列）上验证。
+- **可复现性**：只做"取现成产物"的复现（预构建基础镜像 + ModelScope 权重），
+  不从源码编译 vllm-ascend。详见 [`docs/DEPLOY.md`](docs/DEPLOY.md) 的"可复现性前置"。
+- **已知取舍**：快速档（`APPROX=1`）不保证逐 token 等价；精确档比不截断慢约 10%；
+  分档调度会拖慢长请求（详见 [`CHANGELOG.md`](CHANGELOG.md) 与 [`docs/ROADMAP.md`](docs/ROADMAP.md)）。
+- **CI**：仅静态检查（语法 / 许可证头 / 敏感信息 / 相对链接），真机测试需在 910B 上手动跑。
+
+## 9. 参与贡献
+
+欢迎 issue 与 PR。**提性能相关改动前请先读**
+[`CONTRIBUTING.md`](CONTRIBUTING.md)（尤其是"测量口径"与"整文件 overlay、env 门控、
+默认关闭"的硬要求）以及 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) /
+[`docs/ROADMAP.md`](docs/ROADMAP.md) 里的已验证死路，避免重复负结果。
+
+- 行为准则：[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+- 安全漏洞：请勿公开提 issue，走 [`SECURITY.md`](SECURITY.md)

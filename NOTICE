@@ -3,7 +3,7 @@
 deepseek-v4.1-flash-ascend910B4 —— consumer-tail prefill truncation and scheduling fixes
 for DeepSeek-V4.1-Flash W4A8 on Ascend 910B4.
 
-Copyright 2026 <YOUR NAME / ORG>
+Copyright 2026 zdfb
 
 This product is a **derived work**. It is built on top of, and redistributes
 portions of, the following Apache-2.0 licensed project, and it includes
@@ -29,6 +29,10 @@ modifications to files originating from it (Apache License 2.0, Section 4(b)):
 
 3. **vllm-ascend (V4.1 line)** — https://github.com/GDzhu01/vllm-ascend-v41-private
    Licensed under the Apache License, Version 2.0.
+   NOTE: the upstream repository referenced above is not publicly reachable at the
+   time of writing. It is provided here for attribution only; this project does
+   **not** require access to it — building from source is not supported by this
+   repo. Use the prebuilt base image (see docs/DEPLOY.md) instead.
    Files derived (full-file overlays carrying this project's patches):
      - patches/files/model_v41.py          (from vllm_ascend/models/deepseek_v41/model.py)
      - patches/files/v41_yoco.py           (new module, imported by the above)
